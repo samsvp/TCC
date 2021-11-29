@@ -36,8 +36,6 @@ float local_offset_g;
 float correction_heading_g = 0;
 float local_desired_heading_g; 
 
-
-
 ros::Publisher local_pos_pub;
 ros::Subscriber currentPos;
 ros::Subscriber state_sub;
@@ -46,22 +44,33 @@ ros::ServiceClient land_client;
 ros::ServiceClient set_mode_client;
 ros::ServiceClient takeoff_client;
 ros::ServiceClient command_client;
+
 /**
 \ingroup control_functions
 This structure is a convenient way to format waypoints
 */
-struct gnc_api_waypoint{
+namespace gnc
+{
+
+namespace types
+{
+struct waypoint
+{
 	float x; ///< distance in x with respect to your reference frame
 	float y; ///< distance in y with respect to your reference frame
 	float z; ///< distance in z with respect to your reference frame
 	float psi; ///< rotation about the third axis of your reference frame
 };
+}
+
 
 //get armed state
 void state_cb(const mavros_msgs::State::ConstPtr& msg)
 {
-  current_state_g = *msg;
+	current_state_g = *msg;
 }
+
+
 geometry_msgs::Point enu_2_local(nav_msgs::Odometry current_pose_enu)
 {
   float x = current_pose_enu.pose.pose.position.x;
@@ -77,6 +86,8 @@ geometry_msgs::Point enu_2_local(nav_msgs::Odometry current_pose_enu)
 
   //ROS_INFO("Local position %f %f %f",X, Y, Z);
 }
+
+
 //get current position of drone
 void pose_cb(const nav_msgs::Odometry::ConstPtr& msg)
 {
@@ -94,6 +105,8 @@ void pose_cb(const nav_msgs::Odometry::ConstPtr& msg)
   //ROS_INFO("Current Heading %f origin", current_heading_g);
   //ROS_INFO("x: %f y: %f z: %f", current_pose_g.pose.pose.position.x, current_pose_g.pose.pose.position.y, current_pose_g.pose.pose.position.z);
 }
+
+
 geometry_msgs::Point get_current_location()
 {
 	geometry_msgs::Point current_pos_local;
@@ -101,9 +114,50 @@ geometry_msgs::Point get_current_location()
 	return current_pos_local;
 
 }
+
+
 float get_current_heading()
 {
 	return current_heading_g;
+}
+
+
+/**
+\ingroup control_functions
+This function returns an int of 1 or 0. THis function can be used to check when to request the next waypoint in the mission. 
+@return 1 - waypoint reached 
+@return 0 - waypoint not reached
+*/
+int check_waypoint_reached(float pos_tolerance=0.3, float heading_tolerance=0.01)
+{
+	local_pos_pub.publish(waypoint_g);
+	
+	//check for correct position 
+	float deltaX = abs(waypoint_g.pose.position.x - current_pose_g.pose.pose.position.x);
+    float deltaY = abs(waypoint_g.pose.position.y - current_pose_g.pose.pose.position.y);
+    float deltaZ = 0; //abs(waypoint_g.pose.position.z - current_pose_g.pose.pose.position.z);
+    float dMag = sqrt( pow(deltaX, 2) + pow(deltaY, 2) + pow(deltaZ, 2) );
+    // ROS_INFO("dMag %f", dMag);
+    // ROS_INFO("current pose x %F y %f z %f", (current_pose_g.pose.pose.position.x), (current_pose_g.pose.pose.position.y), (current_pose_g.pose.pose.position.z));
+    // ROS_INFO("waypoint pose x %F y %f z %f", waypoint_g.pose.position.x, waypoint_g.pose.position.y,waypoint_g.pose.position.z);
+    //check orientation
+    float cosErr = cos(current_heading_g*(M_PI/180)) - cos(local_desired_heading_g*(M_PI/180));
+    float sinErr = sin(current_heading_g*(M_PI/180)) - sin(local_desired_heading_g*(M_PI/180));
+    
+    float headingErr = sqrt( pow(cosErr, 2) + pow(sinErr, 2) );
+
+    // ROS_INFO("current heading %f", current_heading_g);
+    // ROS_INFO("local_desired_heading_g %f", local_desired_heading_g);
+    // ROS_INFO("current heading error %f", headingErr);
+
+    if( dMag < pos_tolerance && headingErr < heading_tolerance)
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 
@@ -141,6 +195,8 @@ void set_heading(float heading)
   waypoint_g.pose.orientation.y = qy;
   waypoint_g.pose.orientation.z = qz;
 }
+
+
 // set position to fly to in the local frame
 /**
 \ingroup control_functions
@@ -150,15 +206,18 @@ This function is used to command the drone to fly to a waypoint. These waypoints
 void set_destination(float x, float y, float z, float psi)
 {
 	set_heading(psi);
-	//transform map to local
-	float deg2rad = (M_PI/180);
-	float Xlocal = x*cos((correction_heading_g + local_offset_g - 90)*deg2rad) - y*sin((correction_heading_g + local_offset_g - 90)*deg2rad);
-	float Ylocal = x*sin((correction_heading_g + local_offset_g - 90)*deg2rad) + y*cos((correction_heading_g + local_offset_g - 90)*deg2rad);
-	float Zlocal = z;
 
-	x = Xlocal + correction_vector_g.position.x + local_offset_pose_g.x;
-	y = Ylocal + correction_vector_g.position.y + local_offset_pose_g.y;
-	z = Zlocal + correction_vector_g.position.z + local_offset_pose_g.z;
+	//transform map to local
+	float deg2rad = M_PI/180;
+	float local_angle = (correction_heading_g + local_offset_g - 90) * deg2rad;
+
+	float x_local = x*cos(local_angle) - y * sin(local_angle);
+	float y_local = x * sin(local_angle) + y * cos(local_angle);
+	float z_local = z;
+
+	x = x_local + correction_vector_g.position.x + local_offset_pose_g.x;
+	y = y_local + correction_vector_g.position.y + local_offset_pose_g.y;
+	z = z_local + correction_vector_g.position.z + local_offset_pose_g.z;
 	ROS_INFO("Destination set to x: %f y: %f z: %f origin frame", x, y, z);
 
 	waypoint_g.pose.position.x = x;
@@ -166,8 +225,35 @@ void set_destination(float x, float y, float z, float psi)
 	waypoint_g.pose.position.z = z;
 
 	local_pos_pub.publish(waypoint_g);
+}
+
+
+void set_destination(types::waypoint waypoint)
+{
+	set_destination(waypoint.x, waypoint.y, 
+		waypoint.z, waypoint.psi);
+}
+
+
+void set_trajectory(std::vector<types::waypoint> waypoints, 
+	float eps=0.3, float rate_t=2.0)
+{
+	ros::Rate rate(rate_t);
+
+	for (auto &waypoint: waypoints)
+	{
+		set_destination(waypoint);
+			
+		while(check_waypoint_reached(eps) != 1 && ros::ok())
+		{
+			ros::spinOnce();
+			rate.sleep();
+		}
+	}
 	
 }
+
+
 /**
 \ingroup control_functions
 Wait for connect is a function that will hold the program until communication with the FCU is established.
@@ -183,17 +269,20 @@ int wait4connect()
 		ros::spinOnce();
 		ros::Duration(0.01).sleep();
 	}
+	
 	if(current_state_g.connected)
 	{
 		ROS_INFO("Connected to FCU");	
 		return 0;
-	}else{
+	}
+	else
+	{
 		ROS_INFO("Error connecting to drone");
 		return -1;	
 	}
-	
-	
 }
+
+
 /**
 \ingroup control_functions
 Wait for strat will hold the program until the user signals the FCU to enther mode guided. This is typically done from a switch on the safety pilot’s remote or from the ground control station.
@@ -217,6 +306,8 @@ int wait4start()
 		return -1;	
 	}
 }
+
+
 /**
 \ingroup control_functions
 This function will create a local reference frame based on the starting location of the drone. This is typically done right before takeoff. This reference frame is what all of the the set destination commands will be in reference to.
@@ -255,6 +346,7 @@ int initialize_local_frame()
 	return 0;
 }
 
+
 int arm()
 {
 	//intitialize first waypoint of mission
@@ -284,6 +376,7 @@ int arm()
 		return -1;	
 	}
 }
+
 
 /**
 \ingroup control_functions
@@ -334,41 +427,8 @@ int takeoff(float takeoff_alt)
 	sleep(2);
 	return 0; 
 }
-/**
-\ingroup control_functions
-This function returns an int of 1 or 0. THis function can be used to check when to request the next waypoint in the mission. 
-@return 1 - waypoint reached 
-@return 0 - waypoint not reached
-*/
-int check_waypoint_reached(float pos_tolerance=0.3, float heading_tolerance=0.01)
-{
-	local_pos_pub.publish(waypoint_g);
-	
-	//check for correct position 
-	float deltaX = abs(waypoint_g.pose.position.x - current_pose_g.pose.pose.position.x);
-    float deltaY = abs(waypoint_g.pose.position.y - current_pose_g.pose.pose.position.y);
-    float deltaZ = 0; //abs(waypoint_g.pose.position.z - current_pose_g.pose.pose.position.z);
-    float dMag = sqrt( pow(deltaX, 2) + pow(deltaY, 2) + pow(deltaZ, 2) );
-    // ROS_INFO("dMag %f", dMag);
-    // ROS_INFO("current pose x %F y %f z %f", (current_pose_g.pose.pose.position.x), (current_pose_g.pose.pose.position.y), (current_pose_g.pose.pose.position.z));
-    // ROS_INFO("waypoint pose x %F y %f z %f", waypoint_g.pose.position.x, waypoint_g.pose.position.y,waypoint_g.pose.position.z);
-    //check orientation
-    float cosErr = cos(current_heading_g*(M_PI/180)) - cos(local_desired_heading_g*(M_PI/180));
-    float sinErr = sin(current_heading_g*(M_PI/180)) - sin(local_desired_heading_g*(M_PI/180));
-    
-    float headingErr = sqrt( pow(cosErr, 2) + pow(sinErr, 2) );
 
-    // ROS_INFO("current heading %f", current_heading_g);
-    // ROS_INFO("local_desired_heading_g %f", local_desired_heading_g);
-    // ROS_INFO("current heading error %f", headingErr);
 
-    if( dMag < pos_tolerance && headingErr < heading_tolerance)
-	{
-		return 1;
-	}else{
-		return 0;
-	}
-}
 /**
 \ingroup control_functions
 this function changes the mode of the drone to a user specified mode. This takes the mode as a string. ex. set_mode("GUIDED")
@@ -380,14 +440,18 @@ int set_mode(std::string mode)
 	mavros_msgs::SetMode srv_setMode;
     srv_setMode.request.base_mode = 0;
     srv_setMode.request.custom_mode = mode.c_str();
-    if(set_mode_client.call(srv_setMode)){
+    if(set_mode_client.call(srv_setMode))
+	{
       ROS_INFO("setmode send ok");
 	  return 0;
-    }else{
+    }
+	else
+	{
       ROS_ERROR("Failed SetMode");
       return -1;
     }
 }
+
 
 /**
 \ingroup control_functions
@@ -402,11 +466,15 @@ int land()
   {
     ROS_INFO("land sent %d", srv_land.response.success);
     return 0;
-  }else{
+  }
+  else
+  {
     ROS_ERROR("Landing failed");
     return -1;
   }
 }
+
+
 /**
 \ingroup control_functions
 This function is used to change the speed of the vehicle in guided mode. it takes the speed in meters per second as a float as the input
@@ -425,14 +493,19 @@ int set_speed(float speed__mps)
 	{
 		ROS_INFO("change speed command succeeded %d", speed_cmd.response.success);
 		return 0;
-	}else{
+	}
+	else
+	{
 		ROS_ERROR("change speed command failed %d", speed_cmd.response.success);
 		ROS_ERROR("change speed result was %d ", speed_cmd.response.result);
 		return -1;
 	}
+
 	ROS_INFO("change speed result was %d ", speed_cmd.response.result);
 	return 0;
 }
+
+
 /**
 \ingroup control_functions
 This function is called at the beginning of a program and will start of the communication links to the FCU. The function requires the program's ros nodehandle as an input 
@@ -445,10 +518,13 @@ int init_publisher_subscriber(ros::NodeHandle controlnode)
 	{
 
 		ROS_INFO("using default namespace");
-	}else{
+	}
+	else
+	{
 		controlnode.getParam("namespace", ros_namespace);
 		ROS_INFO("using namespace %s", ros_namespace.c_str());
 	}
+
 	local_pos_pub = controlnode.advertise<geometry_msgs::PoseStamped>((ros_namespace + "/mavros/setpoint_position/local").c_str(), 10);
 	currentPos = controlnode.subscribe<nav_msgs::Odometry>((ros_namespace + "/mavros/global_position/local").c_str(), 10, pose_cb);
 	state_sub = controlnode.subscribe<mavros_msgs::State>((ros_namespace + "/mavros/state").c_str(), 10, state_cb);
@@ -457,5 +533,8 @@ int init_publisher_subscriber(ros::NodeHandle controlnode)
 	set_mode_client = controlnode.serviceClient<mavros_msgs::SetMode>((ros_namespace + "/mavros/set_mode").c_str());
 	takeoff_client = controlnode.serviceClient<mavros_msgs::CommandTOL>((ros_namespace + "/mavros/cmd/takeoff").c_str());
 	command_client = controlnode.serviceClient<mavros_msgs::CommandLong>((ros_namespace + "/mavros/cmd/command").c_str());
+	
 	return 0;
+}
+
 }
