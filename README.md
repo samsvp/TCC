@@ -25,7 +25,7 @@ src/iq_sim/scripts/startsitl.sh # MAVProxy terminal
 roslaunch iq_sim apm.launch
 # New Terminal 
 . devel/setup.bash
-rosrun iq_gnc square
+rosrun drone square
 ```
 
 In the MAVProxy terminal run
