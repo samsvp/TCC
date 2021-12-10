@@ -13,6 +13,11 @@ The project will have a simulation with the following features:
  - Drone patrol's state machine
  - Tracking algorithm testing
 
+## To Do
+- Oil segmentation tracking
+- Add oil to simulation
+- Research termal sensors with less than 1 degree celcius resolution
+
 ## Running
 ```shell
 . devel/setup.bash
