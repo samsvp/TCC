@@ -204,3 +204,5 @@ include_directories(
 
 add_executable(square src/square.cpp)
 target_link_libraries(square ${catkin_LIBRARIES})
+add_executable(target src/follow_target.cpp)
+target_link_libraries(target ${catkin_LIBRARIES})

@@ -20,6 +20,17 @@ namespace types
         float y; ///< distance in y with respect to your reference frame
         float z; ///< distance in z with respect to your reference frame
         float psi; ///< rotation about the third axis of your reference frame
+
+		bool operator==(const waypoint& a) const
+		{
+			return (x == a.x && y == a.y &&
+				z == a.z && psi == a.psi);
+		}
+
+		bool operator!=(const waypoint& a) const
+		{
+			return !(*this==a);
+		}
     };
 }
 
@@ -46,11 +57,13 @@ public:
     This function is used to command the drone to fly to a waypoint. These waypoints should be specified in the local reference frame. This is typically defined from the location the drone is launched. Psi is counter clockwise rotation following the drone’s reference frame defined by the x axis through the right side of the drone with the y axis through the front of the drone. 
     @returns n/a
     */
-    void setDestination(float x, float y, float z, float psi);
-    void setDestination(types::waypoint waypoint);
+    void setDestination(float x, float y, float z, float psi, bool local_frame=false);
+    void setDestination(types::waypoint waypoint, bool local_frame=false);
     
     void setTrajectory(std::vector<types::waypoint> waypoints, 
 	    float eps=0.3, float rate_t=2.0);
+
+	types::waypoint getWaypoint();
 
     /**
     This function returns an int of 1 or 0. THis function can be used to check when to request the next waypoint in the mission. 
@@ -345,22 +358,25 @@ void Drone::setHeading(float heading)
 
 
 // set position to fly to in the local frame
-void Drone::setDestination(float x, float y, float z, float psi)
+void Drone::setDestination(float x, float y, float z, float psi, bool local_frame)
 {
-	setHeading(psi);
+	if (local_frame)
+	{
+		setHeading(psi);
 
-	//transform map to local
-	float deg2rad = M_PI/180;
-	float local_angle = (correction_heading_g + local_offset_g - 90) * deg2rad;
+		//transform map to local
+		float deg2rad = M_PI/180;
+		float local_angle = (correction_heading_g + local_offset_g - 90) * deg2rad;
 
-	float x_local = x*cos(local_angle) - y * sin(local_angle);
-	float y_local = x * sin(local_angle) + y * cos(local_angle);
-	float z_local = z;
+		float x_local = x*cos(local_angle) - y * sin(local_angle);
+		float y_local = x * sin(local_angle) + y * cos(local_angle);
+		float z_local = z;
 
-	x = x_local + correction_vector_g.position.x + local_offset_pose_g.x;
-	y = y_local + correction_vector_g.position.y + local_offset_pose_g.y;
-	z = z_local + correction_vector_g.position.z + local_offset_pose_g.z;
-	ROS_INFO("Destination set to x: %f y: %f z: %f origin frame", x, y, z);
+		x = x_local + correction_vector_g.position.x + local_offset_pose_g.x;
+		y = y_local + correction_vector_g.position.y + local_offset_pose_g.y;
+		z = z_local + correction_vector_g.position.z + local_offset_pose_g.z;
+		ROS_INFO("Destination set to x: %f y: %f z: %f origin frame", x, y, z);
+	}
 
 	waypoint_g.pose.position.x = x;
 	waypoint_g.pose.position.y = y;
@@ -370,10 +386,10 @@ void Drone::setDestination(float x, float y, float z, float psi)
 }
 
 
-void Drone::setDestination(types::waypoint waypoint)
+void Drone::setDestination(types::waypoint waypoint, bool local_frame)
 {
 	setDestination(waypoint.x, waypoint.y, 
-		waypoint.z, waypoint.psi);
+		waypoint.z, waypoint.psi, local_frame);
 }
 
 
@@ -524,6 +540,13 @@ int Drone::land()
         ROS_ERROR("Landing failed");
         return -1;
     }
+}
+
+
+types::waypoint Drone::getWaypoint()
+{
+	return {(float)waypoint_g.pose.position.x, (float)waypoint_g.pose.position.y,
+		(float)waypoint_g.pose.position.z, current_heading_g};
 }
 
 

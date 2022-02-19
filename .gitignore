@@ -1,3 +1,17 @@
+# video files
+*.avi
+*.mp4
+*.MOV
+
+# zips
+*.zip
+*.rar
+
+*.png
+*.jpg
+*.jpeg
+training/
+
 devel/
 logs/
 build/
