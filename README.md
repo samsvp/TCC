@@ -51,6 +51,7 @@ mode guided
 
 [MavROS](http://wiki.ros.org/mavros) (follow [this link](https://github.com/Intelligent-Quads/iq_tutorials/blob/master/docs/installing_ros_20_04.md) for better instructions.)
 
+[asv wave sim vrx](https://github.com/srmainwaring/asv_wave_sim) wave models (switch to development branch).
 ```shell
 wstool init src
 
