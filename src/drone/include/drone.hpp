@@ -57,8 +57,8 @@ public:
     This function is used to command the drone to fly to a waypoint. These waypoints should be specified in the local reference frame. This is typically defined from the location the drone is launched. Psi is counter clockwise rotation following the drone’s reference frame defined by the x axis through the right side of the drone with the y axis through the front of the drone. 
     @returns n/a
     */
-    void setDestination(float x, float y, float z, float psi, bool local_frame=false);
-    void setDestination(types::waypoint waypoint, bool local_frame=false);
+    void setDestination(float x, float y, float z, float psi, bool local_frame=true);
+    void setDestination(types::waypoint waypoint, bool local_frame=true);
     
     void setTrajectory(std::vector<types::waypoint> waypoints, 
 	    float eps=0.3, float rate_t=2.0);

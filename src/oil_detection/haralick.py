@@ -148,6 +148,34 @@ def get_batch(img_path: str, thresh=10) -> \
     return (features, targets)
 
 
+def get_img_tiles(img_path: str, thresh=10) -> \
+        Tuple[np.ndarray, np.ndarray]:
+    """
+    Gets a training batch composed of features and
+    ground truth
+    """
+    img, img_gray, img_mask = load_image_mask(img_path)
+
+    _targets: List[int] = []
+    _tiles: List[np.ndarray] = []
+
+    # extract features from image tile
+    for y in range(TILE_NUMBER[0]):
+        for x in range(TILE_NUMBER[1]):
+            tile = get_tile(img, x, y)
+            if 0 in tile.shape: continue
+
+            tile_mask = get_tile(img_mask, x, y)
+            _target = has_oil(tile_mask, thresh=thresh)
+            _targets.append(_target)
+            _tiles.append(tile)
+    
+    targets = np.array(_targets)
+    tiles = np.array(_tiles)
+
+    return (tiles, targets)
+
+
 def bounding_box(img: np.ndarray, x: int, y: int,
         w: int, h: int) -> np.ndarray:
     """
@@ -233,6 +261,8 @@ img_paths = [f"{folder}/{f}" for f in os.listdir(folder)
     if "img" in f]
 training_len = int(0.95 * len(img_paths))
 
+
+#%%
 print("Creating training dataset")
 _X, _Y = zip(*[get_batch(img_path, 50) 
     for img_path in img_paths[:training_len]])
@@ -248,7 +278,6 @@ X_test = np.array([x for _x in _X for x in _x])
 y_test = np.array([y for _y in _Y for y in _y])
 
 
-# %%
 # test a bunch of classifiers
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
@@ -291,6 +320,48 @@ print("\nFinal scores:")
 for name, score in scores:
     print(f"\t{name}: {score}")
 
+
+#%%
+# raw image test
+classifiers_img = [
+    KNeighborsClassifier(5),
+    DecisionTreeClassifier(class_weight="balanced",
+        random_state=0),
+    RandomForestClassifier(class_weight="balanced",
+        n_estimators=100, random_state=0),
+    MLPClassifier(alpha=1, max_iter=10000, random_state=0),
+    AdaBoostClassifier(random_state=0),
+    QuadraticDiscriminantAnalysis()
+]
+
+scores = []
+
+print("Creating raw image training dataset")
+_X, _Y = zip(*[get_img_tiles(img_path, 50) 
+    for img_path in img_paths[:training_len]])
+X_img = np.array([x.reshape(-1) for _x in _X for x in _x])
+y_img = np.array([y.reshape(-1) for _y in _Y for y in _y])
+
+
+print("Getting test dataset")
+_X, _Y = zip(*[get_img_tiles(img_path) 
+    for img_path in img_paths[training_len:]])
+
+X_img_test = np.array([x.reshape(-1) for _x in _X for x in _x])
+y_img_test = np.array([y.reshape(-1) for _y in _Y for y in _y])
+
+# iterate over classifiers
+for name, clf in zip(names, classifiers_img):
+    print(f"Training {name}")
+    clf.fit(X_img, y_img.reshape(-1))
+    print(f"Validating {name}")
+    score = clf.score(X_img_test, y_img_test.reshape(-1))
+    scores.append((name, score))
+
+scores.sort(key=lambda x: x[-1], reverse=True)
+print("\nFinal scores:")
+for name, score in scores:
+    print(f"\t{name}: {score}")
 
 # %%
 img_path = "training/34_img.png"
