@@ -2,6 +2,7 @@
 *.avi
 *.mp4
 *.MOV
+*.TIFF
 
 # zips
 *.zip
@@ -71,3 +72,7 @@ CATKIN_IGNORE
 # MAV
 src/mavros
 src/mavlink
+
+# vrx
+src/vrx
+src/asv_wave_sim
