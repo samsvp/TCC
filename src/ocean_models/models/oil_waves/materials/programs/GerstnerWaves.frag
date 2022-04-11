@@ -136,7 +136,7 @@ void main(void)
     float gradient = smoothstep(0.4, 0.6, brightness);
     vec4 rainbow = frequency_to_rgb(gradient);
     vec3 rainbow3 = mix(vec3(1.0, 1.0, 1.0), rainbow.rgb, 0.5);
-    vec3 irColor = mix(color.rgb, rainbow3, 1.0 - brightness);
+    vec3 irColor = mix(color.rgb, rainbow3, 0.75);
 
     color = vec4(mix(color.rgb, irColor, c), 1.0);
 

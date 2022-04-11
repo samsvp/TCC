@@ -38,6 +38,11 @@ In the MAVProxy terminal run
 mode guided 
 ```
 
+To view the drone camera run
+```
+rosrun image_view image_view image:=/webcam/image_raw
+```
+
 ## Dependencies
 [Ardupilot](https://github.com/ArduPilot/ardupilot) (follow 
     [this link](https://github.com/Intelligent-Quads/iq_tutorials/blob/master/docs/Installing_Ardupilot_20_04.md) for instructions.)
