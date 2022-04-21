@@ -37,7 +37,7 @@ namespace types
 class Drone
 {
 public:
-    Drone(float duration, ros::NodeHandle& control_node);
+    Drone(float battery_duration, ros::NodeHandle& control_node);
     ~Drone();
 
     Battery battery;
@@ -47,30 +47,52 @@ public:
 
     //set orientation of the drone (drone should always be level) 
     // Heading input should match the ENU coordinate system
+
     /**
-    This function is used to specify the drone’s heading in the local reference frame. Psi is a counter clockwise rotation following the drone’s reference frame defined by the x axis through the right side of the drone with the y axis through the front of the drone. 
+    This function is used to specify the drone’s heading in the local reference frame. 
+	Psi is a counter clockwise rotation following the drone’s reference frame defined by the 
+	x axis through the right side of the drone with the y axis through the front of the drone. 
     @returns n/a
     */
     void setHeading(float heading);
 
     /**
-    This function is used to command the drone to fly to a waypoint. These waypoints should be specified in the local reference frame. This is typically defined from the location the drone is launched. Psi is counter clockwise rotation following the drone’s reference frame defined by the x axis through the right side of the drone with the y axis through the front of the drone. 
-    @returns n/a
+    This function is used to command the drone to fly to a waypoint. These waypoints should 
+	be specified in the local reference frame. This is typically defined from the location 
+	the drone is launched. Psi is counter clockwise rotation following the drone’s reference 
+	frame defined by the x axis through the right side of the drone with the y axis through the 
+	front of the drone. 
+    @returns true if destination was set, false otherwise
     */
-    void setDestination(float x, float y, float z, float psi, bool local_frame=true);
-    void setDestination(types::waypoint waypoint, bool local_frame=true);
+    bool setDestination(float x, float y, float z, float psi, bool local_frame=true);
+    bool setDestination(types::waypoint waypoint, bool local_frame=true);
     
     void setTrajectory(std::vector<types::waypoint> waypoints, 
 	    float eps=0.3, float rate_t=2.0);
 
-	types::waypoint getWaypoint();
+	/**
+	 * Pauses the current trajectory and saves the remaining waypoints
+	 * to resume it later. This allows the drone to go to new positions using the
+	 * setDestination method.
+	 * @returns n/a
+	 */
+	void pauseTrajectory();
 
+	/**
+	 * Resumes the last paused trajectory.
+	 * @returns n/a
+	 */
+	void resumeTrajectory();
+
+	types::waypoint getWaypoint() const;
+	
     /**
-    This function returns an int of 1 or 0. THis function can be used to check when to request the next waypoint in the mission. 
+    This function returns an int of 1 or 0. THis function can be used to check when to 
+	request the next waypoint in the mission. 
     @return 1 - waypoint reached 
     @return 0 - waypoint not reached
     */
-    int checkWaypointReached(float pos_tolerance=0.3, float heading_tolerance=0.01);
+    int checkWaypointReached(float pos_tolerance=0.3, float heading_tolerance=0.01) const;
 
     /**
     this function changes the mode of the drone to land
@@ -88,6 +110,13 @@ private:
     geometry_msgs::Pose correction_vector_g;
     geometry_msgs::Point local_offset_pose_g;
     geometry_msgs::PoseStamped waypoint_g;
+
+	// variable that hold if a trajectory must be broken
+	bool break_trajectory;
+	bool doing_trajectory;
+	// holds the uncompleted waypoints if break trajectory is called
+	std::vector<types::waypoint> last_waypoints;
+	
 
     float current_heading_g;
     float local_offset_g;
@@ -228,7 +257,7 @@ void Drone::poseCb(const nav_msgs::Odometry::ConstPtr& msg)
 
 int Drone::arm()
 {
-	//intitialize first waypoint of mission
+	//initialize first waypoint of mission
 	setDestination(0,0,0,0);
 	for(int i=0; i<100; i++)
 	{
@@ -263,7 +292,7 @@ int Drone::arm()
 
 int Drone::takeoff(float takeoff_alt)
 {
-	//intitialize first waypoint of mission
+	//initialize first waypoint of mission
 	setDestination(0,0,takeoff_alt,0);
 	for(int i=0; i<100; i++)
 	{
@@ -358,8 +387,10 @@ void Drone::setHeading(float heading)
 
 
 // set position to fly to in the local frame
-void Drone::setDestination(float x, float y, float z, float psi, bool local_frame)
+bool Drone::setDestination(float x, float y, float z, float psi, bool local_frame)
 {
+	if (this->doing_trajectory) return false;
+
 	if (local_frame)
 	{
 		setHeading(psi);
@@ -368,7 +399,7 @@ void Drone::setDestination(float x, float y, float z, float psi, bool local_fram
 		float deg2rad = M_PI/180;
 		float local_angle = (correction_heading_g + local_offset_g - 90) * deg2rad;
 
-		float x_local = x*cos(local_angle) - y * sin(local_angle);
+		float x_local = x * cos(local_angle) - y * sin(local_angle);
 		float y_local = x * sin(local_angle) + y * cos(local_angle);
 		float z_local = z;
 
@@ -383,12 +414,14 @@ void Drone::setDestination(float x, float y, float z, float psi, bool local_fram
 	waypoint_g.pose.position.z = z;
 
 	local_pos_pub.publish(waypoint_g);
+
+	return true;
 }
 
 
-void Drone::setDestination(types::waypoint waypoint, bool local_frame)
+bool Drone::setDestination(types::waypoint waypoint, bool local_frame)
 {
-	setDestination(waypoint.x, waypoint.y, 
+	return this->setDestination(waypoint.x, waypoint.y, 
 		waypoint.z, waypoint.psi, local_frame);
 }
 
@@ -398,21 +431,50 @@ void Drone::setTrajectory(std::vector<types::waypoint> waypoints,
 {
 	ros::Rate rate(rate_t);
 
-	for (auto &waypoint: waypoints)
+	for (size_t i=0; i<waypoints.size(); i++)
 	{
+		auto waypoint = waypoints[i];
+
+		this->doing_trajectory = false;
 		setDestination(waypoint);
-			
-		while(checkWaypointReached(eps) != 1 && ros::ok())
+		this->doing_trajectory = true;
+		
+		if (this->break_trajectory) 
+		{
+			// save remaining waypoints
+			this->last_waypoints = std::vector<types::waypoint>(
+				waypoints.begin() + i, waypoints.end());
+			this->break_trajectory = false;
+			break;
+		}
+
+		while(this->checkWaypointReached(eps) != 1 && 
+				ros::ok() && !this->break_trajectory)
 		{
 			ros::spinOnce();
 			rate.sleep();
 		}
+
 	}
 	
+	this->doing_trajectory = false;
 }
 
 
-int Drone::checkWaypointReached(float pos_tolerance, float heading_tolerance)
+void Drone::pauseTrajectory()
+{
+	this->break_trajectory = true;
+}
+
+
+void Drone::resumeTrajectory()
+{
+	if (!this->last_waypoints.empty())
+		this->setTrajectory(this->last_waypoints);	
+}
+
+
+int Drone::checkWaypointReached(float pos_tolerance, float heading_tolerance) const
 {
 	local_pos_pub.publish(waypoint_g);
 	
@@ -543,7 +605,7 @@ int Drone::land()
 }
 
 
-types::waypoint Drone::getWaypoint()
+types::waypoint Drone::getWaypoint() const
 {
 	return {(float)waypoint_g.pose.position.x, (float)waypoint_g.pose.position.y,
 		(float)waypoint_g.pose.position.z, current_heading_g};
