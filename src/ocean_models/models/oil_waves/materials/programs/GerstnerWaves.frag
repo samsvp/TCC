@@ -128,16 +128,18 @@ void main(void)
     // Perform linear interpolation between reflection and refraction.
     vec4 color = mix(waterColor, envColor, refractionRatio);
 
+
+    vec2 oil_pos = pos.xy - vec2(20.0, 10.0);
     // generate circular spill
     float low_thresh = 20.0 * ( 1.0 + 0.1 * 
         // make spill bigger with time
         (0.5 * cos(time) + 1.5) * 
         sin( // deform the circle to look more like an oil spill
-        atan(pos.y, pos.x) * 15.0)
+        atan(oil_pos.y, oil_pos.x) * 15.0)
     );
     float high_thresh = low_thresh + 0.5;
-    float l = pos.y > 0.0 ? dot(vec2(5., 10.0/time) * pos.xy, pos.xy) :
-            dot(vec2(5., max(50.0/time, 2.0)) * pos.xy, pos.xy);
+    float l = oil_pos.y > 0.0 ? dot(vec2(5., 10.0/time) * oil_pos, oil_pos) :
+            dot(vec2(5., max(50.0/time, 2.0)) * oil_pos, oil_pos);
     float c = 1.0 - smoothstep(low_thresh, high_thresh, l);
 
     float brightness = (0.2126*R.b + 0.7152*R.g + 0.0722*R.b);

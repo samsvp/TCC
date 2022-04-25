@@ -29,6 +29,31 @@
     </include>
 
 
+    <model name="simple_box">
+    <link name="link">
+      <kinematic>1</kinematic>
+      <visual name="visual">
+        <origin xyz="0.7 0 0.56"/>
+        <geometry>
+          <box size="0.02 0.02 0.02" />
+        </geometry>
+      </visual>
+      <collision name="collision">
+        <origin xyz="0.7 0 0.56"/>
+        <geometry>
+          <box size="0.02 0.02 0.02" />
+        </geometry>
+      </collision>
+      <material>
+        <script>
+          <uri>file://media/materials/scripts/gazebo.material</uri>
+          <name>Gazebo/Grey</name>
+        </script>
+      </material>
+    </link>
+    </model>
+
+
     <model name="water">
     <include>
       <uri>model://oil_waves</uri>
