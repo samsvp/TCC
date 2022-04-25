@@ -20,6 +20,7 @@ uniform vec4 deepColor;
 uniform vec4 shallowColor;
 uniform float fresnelPower;
 uniform float hdrMultiplier;
+uniform float time;
 
 // Input computed in vertex shader
 varying mat3 rotMatrix;
@@ -128,15 +129,22 @@ void main(void)
     vec4 color = mix(waterColor, envColor, refractionRatio);
 
     // generate circular spill
-    float low_thresh = 0.2 + 0.1 * sin(atan(pos.y, pos.x) * 5.0 + 25.0 * pos.x);
-    float high_thresh = 20.8;
-    float c = 1.0 - smoothstep(low_thresh, high_thresh, length(pos));
+    float low_thresh = 20.0 * ( 1.0 + 0.1 * 
+        // make spill bigger with time
+        (0.5 * cos(time) + 1.5) * 
+        sin( // deform the circle to look more like an oil spill
+        atan(pos.y, pos.x) * 15.0)
+    );
+    float high_thresh = low_thresh + 0.5;
+    float l = pos.y > 0.0 ? dot(vec2(5., 10.0/time) * pos.xy, pos.xy) :
+            dot(vec2(5., max(50.0/time, 2.0)) * pos.xy, pos.xy);
+    float c = 1.0 - smoothstep(low_thresh, high_thresh, l);
 
     float brightness = (0.2126*R.b + 0.7152*R.g + 0.0722*R.b);
     float gradient = smoothstep(0.4, 0.6, brightness);
     vec4 rainbow = frequency_to_rgb(gradient);
-    vec3 rainbow3 = mix(vec3(1.0, 1.0, 1.0), rainbow.rgb, 0.5);
-    vec3 irColor = mix(color.rgb, rainbow3, 0.75);
+    vec3 rainbow3 = mix(vec3(0.2392, 0.1804, 0.1804), rainbow.rgb, 0.75);
+    vec3 irColor = mix(color.rgb, rainbow3, 0.5);
 
     color = vec4(mix(color.rgb, irColor, c), 1.0);
 

@@ -51,6 +51,7 @@ material ASVWaveSim/GerstnerWaves
         param_named hdrMultiplier float 0.4
         param_named bumpMap int 0
         param_named cubeMap int 1
+        param_named_auto time time_0_x 100.0
       }
 
       texture_unit
