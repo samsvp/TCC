@@ -13,7 +13,7 @@ public:
     
     // battery duration in seconds
     const float duration;
-    // funciton to publish battery remaining time
+    // function to publish battery remaining time
     float remainingTime()
     {
         auto now = std::chrono::system_clock::now();

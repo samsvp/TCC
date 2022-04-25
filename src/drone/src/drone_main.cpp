@@ -20,7 +20,9 @@ public:
         this->go_to_pos_sub = control_node.subscribe(
             "/go_to_pos", 1, &DroneMain::goToPosition, this);
 
+        this->oil_detected = false;
         this->break_trajectory = false;
+
         this->waypointLoop();
 
     }
@@ -36,12 +38,14 @@ public:
 
         this->break_trajectory = true;
         
+        // pause trajectory to go to new target
         this->drone.pauseTrajectory();
         float psi = this->quaternionToHeading(pose->orientation);
         std::vector<types::waypoint> waypoints = {
             { pose->position.x, pose->position.y, pose->position.z, psi }
         };
         this->drone.setTrajectory(waypoints);
+        // resume trajectory should be based on state machine
         this->drone.resumeTrajectory();
 
         this->break_trajectory = false;
@@ -52,6 +56,9 @@ private:
     Drone drone; 
     ros::Subscriber go_to_pos_sub;
 
+
+    // hold if oil has been detected on the given frame
+    bool oil_detected;
     // holds if the drone should break the main trajectory
     bool break_trajectory;
     // holds the main waypoints that the drone should patrol
@@ -92,6 +99,7 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "gnc_node");
 	ros::NodeHandle nh;
 
+    // main patrol
     std::vector<types::waypoint> waypoints = {
 		{0, 0, 3, 0},
 		{5, 0, 3, -90},
