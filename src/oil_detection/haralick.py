@@ -19,6 +19,11 @@ IMG_SHAPE = (480, 640)
 TILE_NUMBER = (IMG_SHAPE[0]//TILE_X, IMG_SHAPE[1]//TILE_Y)
 
 
+def iou(mask1: np.ndarray, mask2: np.ndarray) -> float:
+    """Returns the intersection over union of the masks"""
+    return np.sum(mask1 & mask2) / np.sum(mask1 | mask2)
+
+
 def load_image_mask(img_path: str) -> \
         Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -188,6 +193,37 @@ def bounding_box(img: np.ndarray, x: int, y: int,
         color, thickness)
 
 
+def get_prediction_mask(_img: np.ndarray, 
+        clf: ClassifierMixin, thresh=0.25) -> np.ndarray:
+    """
+    Returns the mask using color segmentation with 
+    the predictions of the given classifier
+    """
+    img = _img.copy()
+    mmask = np.zeros(img.shape[:2])
+    for y in range(TILE_NUMBER[0]):
+        for x in range(TILE_NUMBER[1]):
+            tile = get_tile(img, x, y)
+            tile_gray = cv2.cvtColor(tile, cv2.COLOR_BGR2GRAY)
+            h_feats = get_high_level_feats(tile_gray)
+            l_feats = get_low_level_feats(tile)
+            features = np.append(
+                 l_feats, h_feats).reshape(1, -1)
+            
+            if clf.predict_proba(features)[:,1] < thresh:
+                continue
+            
+            mask = apply_oil_mask(img, x, y)
+            
+            tile_x1 = TILE_X * x
+            tile_x2 = TILE_X * (x + 1)
+            tile_y1 = TILE_Y * y
+            tile_y2 = TILE_Y * (y + 1)
+            mmask[tile_x1:tile_x2, tile_y1:tile_y2] = mask
+
+    return mmask
+
+
 def get_bounding_boxes(_img: np.ndarray, 
         clf: ClassifierMixin, thresh=0.25) -> np.ndarray:
     """
@@ -322,6 +358,53 @@ print("\nFinal scores:")
 for name, score in scores:
     print(f"\t{name}: {score}")
 
+
+#%%
+### IOU calculation
+# Get masks
+folder = "test"
+test_path = [f"{folder}/{f}" for f in os.listdir(folder) 
+    if "img" in f]
+
+images, images_gray, images_mask = zip(
+    *[load_image_mask(img_path) 
+        for img_path in test_path]
+)
+
+ious_d = {}
+for t in np.arange(0.1, 1.0, 0.1):
+    pred_masks = [
+        get_prediction_mask(
+            cv2.cvtColor(img, cv2.COLOR_BGR2RGB), 
+            classifiers[2], thresh=t)
+        for img in images
+    ]
+
+    ious = [iou(pred_masks[i].astype(np.uint8), 
+                images_mask[i][...,0]) 
+            for i in range(len(pred_masks))]
+
+    ious_d[t] = ious
+    print(t, "\n", ious, np.mean(ious), np.median(ious))
+    print("\n")
+
+
+#%%
+indexes = [i for i,v in enumerate(ious_d[0.6]) if v < 0.3]
+
+pred_masks = [
+    get_prediction_mask(
+        cv2.cvtColor(img, cv2.COLOR_BGR2RGB), 
+        classifiers[2], thresh=0.6)
+    for img in images
+    # if i not in indexes
+]
+
+for i in range(len(pred_masks)):
+    f, axarr = plt.subplots(1,3)
+    axarr[0].imshow(pred_masks[i])
+    axarr[1].imshow(images_mask[i])
+    axarr[2].imshow(images[i])
 
 #%%
 # raw image test
