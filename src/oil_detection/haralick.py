@@ -209,7 +209,9 @@ def get_bounding_boxes(_img: np.ndarray,
                 continue
             
             mask = apply_oil_mask(img, x, y)
-            if (oil_area:= np.sum(mask)) <= 30:
+            oil_area = np.sum(mask)
+            if oil_area <= 30:
+            #if (oil_area:= np.sum(mask)) <= 30:
                 continue
             area += oil_area
 
@@ -259,7 +261,7 @@ def apply_oil_mask(img: np.ndarray, x: int, y: int) -> \
 folder = "training"
 img_paths = [f"{folder}/{f}" for f in os.listdir(folder) 
     if "img" in f]
-training_len = int(0.95 * len(img_paths))
+training_len = int(0.8 * len(img_paths))
 
 
 #%%
@@ -364,7 +366,8 @@ for name, score in scores:
     print(f"\t{name}: {score}")
 
 # %%
-img_path = "training/34_img.png"
+#img_path = "training/34_img.png"
+img_path = "training/114_img.png"
 img, img_gray, img_mask = load_image_mask(img_path)
 print(img_gray.shape)
 
@@ -373,6 +376,11 @@ plt.imshow(img_gray, cmap="gray")
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 for name, clf in zip(names, classifiers):
     plt.imshow(get_bounding_boxes(img, clf))
+    
+    # for tcc
+    # if name == "Random Forest":
+    #     plt.savefig("random_forest21.png")
+        
     plt.title(name)
     plt.show()
 
