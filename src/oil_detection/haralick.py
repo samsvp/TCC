@@ -244,16 +244,12 @@ def get_bounding_boxes(_img: np.ndarray,
             if clf.predict_proba(features)[:,1] < thresh:
                 continue
             
-            mask = apply_oil_mask(img, x, y)
+            mask = apply_oil_mask(img, x, y, True)
             oil_area = np.sum(mask)
-            if oil_area <= 30:
+            #if oil_area <= 30:
             #if (oil_area:= np.sum(mask)) <= 30:
-                continue
+            #    continue
             area += oil_area
-
-            img = bounding_box(img, 
-                y * TILE_Y, x * TILE_X, TILE_Y, TILE_X)
-            
     
     position = (10, 50)
     cv2.putText(
@@ -277,8 +273,8 @@ def get_oil_mask(img: np.ndarray) -> np.ndarray:
     return mask
 
 
-def apply_oil_mask(img: np.ndarray, x: int, y: int) -> \
-        np.ndarray:
+def apply_oil_mask(img: np.ndarray, x: int, y: int,
+        draw_box=False) -> np.ndarray:
     """
     Applies the oil mask in the specified image region
     """
@@ -290,6 +286,13 @@ def apply_oil_mask(img: np.ndarray, x: int, y: int) -> \
     mask = get_oil_mask(tile)
     img[tile_x1:tile_x2, tile_y1:tile_y2] += \
         np.array([100, 0, 0], dtype=np.uint8) * mask[..., None]
+    
+    if draw_box:
+        img[tile_x1:tile_x2, tile_y1:tile_y1+3] = [0, 0, 255]
+        img[tile_x1:tile_x1+3, tile_y1:tile_y2] = [0, 0, 255]
+        img[tile_x1:tile_x2, tile_y2-3:tile_y2] = [0, 0, 255]
+        img[tile_x2-3:tile_x2, tile_y1:tile_y2] = [0, 0, 255]
+    
     return mask
 
 
@@ -359,6 +362,10 @@ for name, score in scores:
     print(f"\t{name}: {score}")
 
 
+from sklearn.metrics import confusion_matrix
+
+y_pred = classifiers[2].predict(X_test)
+confusion_matrix(y_pred, y_test)
 #%%
 ### IOU calculation
 # Get masks
@@ -390,21 +397,68 @@ for t in np.arange(0.1, 1.0, 0.1):
 
 
 #%%
-indexes = [i for i,v in enumerate(ious_d[0.6]) if v < 0.3]
 
 pred_masks = [
     get_prediction_mask(
         cv2.cvtColor(img, cv2.COLOR_BGR2RGB), 
-        classifiers[2], thresh=0.6)
+        classifiers[2], thresh=0.5)
     for img in images
-    # if i not in indexes
 ]
 
-for i in range(len(pred_masks)):
+for i in range(len(pred_masks)): 
+    p_sum = np.sum(pred_masks[i]) / 255
+    m_sum = np.sum(images_mask[i][...,0]) / 255
+    diff = np.abs(p_sum - m_sum)/m_sum
+    print(i, diff)
     f, axarr = plt.subplots(1,3)
+    f.set_size_inches(18.5, 10.5)
     axarr[0].imshow(pred_masks[i])
     axarr[1].imshow(images_mask[i])
     axarr[2].imshow(images[i])
+    plt.show()
+
+
+l = []
+for i in range(len(pred_masks)): 
+    p_sum = np.sum(pred_masks[i]) / 255
+    m_sum = np.sum(images_mask[i][...,0]) / 255
+    diff = np.abs(p_sum - m_sum)/m_sum
+    print(i, diff)
+    l.append(diff)
+print(l.mean(), l.std())
+
+
+#%%
+# Apply oil masks
+import matplotlib.pylab as pl
+import matplotlib.gridspec as gridspec
+
+pred_masks = [
+    get_bounding_boxes(
+        cv2.cvtColor(img, cv2.COLOR_BGR2RGB), 
+        classifiers[2], thresh=0.5)
+    for img in images
+]
+
+for i in range(len(images)):
+    gs = gridspec.GridSpec(2, 2)
+    gs.update(wspace=0.1, hspace=0.25)
+    pl.figure().set_size_inches(12.5, 10.5)
+    
+    ax = pl.subplot(gs[0, 0]) # row 0, col 0
+    ax.imshow(images[i])
+    ax.set_title("Original image")
+    
+    ax = pl.subplot(gs[0, 1]) # row 0, col 1
+    ax.imshow(images[i] + np.array(
+        images_mask[i] / 255 * 200, dtype=np.uint8))
+    ax.set_title("Ground truth mask on original image")
+    
+    ax = pl.subplot(gs[1, :]) # row 1, span all columns
+    ax.imshow(pred_masks[i])
+    ax.set_title("Predicted truth mask on original image")
+    
+
 
 #%%
 # raw image test
@@ -450,7 +504,7 @@ for name, score in scores:
 
 # %%
 #img_path = "training/34_img.png"
-img_path = "training/114_img.png"
+img_path = "training/50_img.png"
 img, img_gray, img_mask = load_image_mask(img_path)
 print(img_gray.shape)
 
@@ -461,8 +515,8 @@ for name, clf in zip(names, classifiers):
     plt.imshow(get_bounding_boxes(img, clf))
     
     # for tcc
-    # if name == "Random Forest":
-    #     plt.savefig("random_forest21.png")
+    if name == "Random Forest":
+        plt.savefig("random_forest50.png")
         
     plt.title(name)
     plt.show()
