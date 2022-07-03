@@ -119,7 +119,7 @@ void main(void)
     envColor.rgb *= (envColor.r+envColor.g+envColor.b)*hdrMultiplier;
 
 	// Compute refraction ratio (Fresnel):
-    float facing = 1.0 - dot(-E, N);
+    float facing = dot(-E, N);//1.0 - dot(-E, N);
     float refractionRatio = clamp(pow(facing, fresnelPower), 0.0, 1.0);
 
     // Refracted ray only considers deep and shallow water colors:
