@@ -10,11 +10,16 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   mavros
   std_msgs
+  cv_bridge
   geometry_msgs
   mavros_msgs
   rospy
   sensor_msgs
 )
+
+find_package(OpenCV REQUIRED)
+
+include_directories(${OpenCV_INCLUDE_DIRS})
 
 catkin_package(
 #  INCLUDE_DIRS include
@@ -30,7 +35,7 @@ include_directories(
 
 
 add_executable(drone src/drone_main.cpp)
-target_link_libraries(drone ${catkin_LIBRARIES})
+target_link_libraries(drone ${catkin_LIBRARIES} ${OpenCV_LIBS})
 add_executable(square src/square.cpp)
 target_link_libraries(square ${catkin_LIBRARIES})
 add_executable(target src/follow_target.cpp)

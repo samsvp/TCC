@@ -37,7 +37,7 @@ namespace types
 class Drone
 {
 public:
-    Drone(float battery_duration, ros::NodeHandle& control_node);
+    Drone(float battery_duration, ros::NodeHandle& control_node, float h=3);
     ~Drone();
 
     Battery battery;
@@ -172,7 +172,7 @@ private:
 };
 
 
-Drone::Drone(float duration, ros::NodeHandle& control_node)
+Drone::Drone(float duration, ros::NodeHandle& control_node, float h)
 {
     Battery battery = Battery(duration);
 
@@ -208,16 +208,16 @@ Drone::Drone(float duration, ros::NodeHandle& control_node)
 
 
   	// wait for FCU connection
-	wait4connect();
+	this->wait4connect();
 
 	//wait for used to switch to mode GUIDED
-	wait4start();
+	this->wait4start();
 
 	//create local reference frame 
-	initializeLocalFrame();
+	this->initializeLocalFrame();
 
 	//request takeoff
-	takeoff(3);
+	this->takeoff(h);
 }
 
 Drone::~Drone() { }
@@ -293,7 +293,7 @@ int Drone::arm()
 int Drone::takeoff(float takeoff_alt)
 {
 	//initialize first waypoint of mission
-	setDestination(0,0,takeoff_alt,0);
+	this->setDestination(0,0,takeoff_alt,0);
 	for(int i=0; i<100; i++)
 	{
 		local_pos_pub.publish(waypoint_g);
@@ -337,7 +337,13 @@ int Drone::takeoff(float takeoff_alt)
 		return -2;
 	}
 
-	sleep(2);
+	ros::Rate rate(0.1);
+	while(this->checkWaypointReached(0.5) != 1 && 
+				ros::ok() && !this->break_trajectory)
+	{
+		ros::spinOnce();
+		rate.sleep();
+	}
 	return 0; 
 }
 
