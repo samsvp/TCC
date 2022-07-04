@@ -21,7 +21,7 @@ The project will have a simulation with the following features:
 ## Running
 ```shell
 . devel/setup.bash
-roslaunch iq_sim droneOnly.launch
+roslaunch ocean_models oil_world.launch
 # New Terminal
 . devel/setup.bash
 src/iq_sim/scripts/startsitl.sh # MAVProxy terminal
@@ -30,7 +30,7 @@ src/iq_sim/scripts/startsitl.sh # MAVProxy terminal
 roslaunch iq_sim apm.launch
 # New Terminal 
 . devel/setup.bash
-rosrun drone square
+rosrun drone drone
 ```
 
 In the MAVProxy terminal run
