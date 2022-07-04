@@ -137,9 +137,12 @@ void main(void)
         sin( // deform the circle to look more like an oil spill
         atan(oil_pos.y, oil_pos.x) * 15.0)
     );
+
+    // the spill speed
+    float speed = 0.05 * time;
     float high_thresh = low_thresh + 0.5;
-    float l = oil_pos.y > 0.0 ? dot(vec2(5., 10.0/time) * oil_pos, oil_pos) :
-            dot(vec2(5., max(50.0/time, 2.0)) * oil_pos, oil_pos);
+    float l = oil_pos.y > 0.0 ? dot(vec2(5., 10.0/speed) * oil_pos, oil_pos) :
+            dot(vec2(5., max(50.0/speed, 2.0)) * oil_pos, oil_pos);
     float c = 1.0 - smoothstep(low_thresh, high_thresh, l);
 
     float brightness = (0.2126*R.b + 0.7152*R.g + 0.0722*R.b);
