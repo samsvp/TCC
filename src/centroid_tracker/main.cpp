@@ -4,7 +4,7 @@
 #include <iostream>
 #include <algorithm>
 
-#include "tracker.hpp"
+#include "include/tracker.hpp"
 
 cv::Mat translateImg(cv::Mat &img, int offsetx, int offsety){
     cv::Mat trans_mat = (cv::Mat_<double>(2,3) << 1, 0, offsetx, 0, 1, offsety);
@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 
     // Load the image
     cv::CommandLineParser parser( argc, argv, "{@input | cards.png | input image}" );
-    cv::Mat src = imread( parser.get<cv::String>( "@input" ) );
+    cv::Mat src = cv::imread( parser.get<cv::String>( "@input" ) );
     if(src.empty())
     {
         std::cout << "Could not open or find the image!\n" << std::endl;
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
         }
         
         // show the resultant image
-        cv::namedWindow("Contours", CV_WINDOW_NORMAL);
+        cv::namedWindow("Contours", cv::WINDOW_NORMAL);
         cv::imshow("Contours", drawing);
         cv::waitKey(0);
 
