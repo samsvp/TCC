@@ -9,6 +9,8 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   mavros
   std_msgs
+  opencv2
+  cv_bridge
   geometry_msgs
   mavros_msgs
   rospy
