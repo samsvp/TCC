@@ -140,9 +140,9 @@ private:
         // sets as 255 everything in range
         int area = cv::sum(res)[0] / 255;
         // the pixel size will be the square root of the area of the square
-        int size = static_cast<int>(std::sqrt(area));
+        float size = std::sqrt(area);
         // the square has a real world length of 1x1, so 1m/pixel_size = size/1px
-        this->pixel_size = 1.0 / static_cast<float>(size);
+        this->pixel_size = 1.0 / size;
         
         ROS_INFO("1px equals to %f m", this->pixel_size);
     }

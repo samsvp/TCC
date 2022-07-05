@@ -36,6 +36,10 @@ include_directories(
 
 add_executable(drone src/drone_main.cpp)
 target_link_libraries(drone ${catkin_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable(spill_tracker src/spill_tracker.cpp)
+target_link_libraries(spill_tracker ${catkin_LIBRARIES} ${OpenCV_LIBS})
+
 add_executable(square src/square.cpp)
 target_link_libraries(square ${catkin_LIBRARIES})
 add_executable(target src/follow_target.cpp)
