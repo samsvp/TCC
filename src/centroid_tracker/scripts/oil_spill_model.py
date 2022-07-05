@@ -1,9 +1,11 @@
+#!/usr/bin/python3
 #%%
 import cv2
 import numpy as np
 
 import rospy
 from std_msgs.msg import Float32
+from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -29,10 +31,8 @@ class image_converter:
     def __init__(self):
         self.bridge = CvBridge()
         
-        self.cx_pub = rospy.Publisher(
-            "/truth/centroid_x", Float32, queue_size=10)
-        self.cy_pub = rospy.Publisher(
-            "/truth/centroid_y", Float32, queue_size=10)
+        self.centroid_pub = rospy.Publisher(
+            "/truth/centroid_pos", Float64MultiArray, queue_size=10)
         self.area_pub = rospy.Publisher(
             "/truth/spill_size", Float32, queue_size=10)
         
@@ -97,9 +97,8 @@ class image_converter:
 
         spill_area, centroid = self.get_spill_info(self.image)
         
-        self.cx_pub.publish(Float32(centroid[0]))
-        self.cy_pub.publish(Float32(centroid[1]))
         self.area_pub.publish(Float32(spill_area))
+        self.centroid_pub.publish(Float64MultiArray(data=centroid))
         
         print(f"Spill area = {spill_area}, centroid = {centroid}")
 
