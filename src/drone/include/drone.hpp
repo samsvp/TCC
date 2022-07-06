@@ -1,3 +1,5 @@
+#pragma once
+
 #include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/State.h>
@@ -20,6 +22,9 @@ namespace types
         float y; ///< distance in y with respect to your reference frame
         float z; ///< distance in z with respect to your reference frame
         float psi; ///< rotation about the third axis of your reference frame
+
+		waypoint(float x, float y, float z, float psi) : x(x), y(y), z(z), psi(psi)
+		{ }
 
 		bool operator==(const waypoint& a) const
 		{
@@ -338,7 +343,7 @@ int Drone::takeoff(float takeoff_alt)
 	}
 
 	ros::Rate rate(0.1);
-	while(this->checkWaypointReached(0.5) != 1 && 
+	while(this->checkWaypointReached(0.1) != 1 && 
 				ros::ok() && !this->break_trajectory)
 	{
 		ros::spinOnce();

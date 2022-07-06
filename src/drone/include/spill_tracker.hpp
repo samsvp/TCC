@@ -2,9 +2,9 @@
 
 #include <ros/ros.h>
 #include <opencv2/core.hpp>
+#include <geometry_msgs/Point.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
-#include <geometry_msgs/Point.h>
 #include <image_transport/image_transport.h>
 
 #include "tracker.hpp"
@@ -98,9 +98,10 @@ cv::Mat SpillTracker::drawContours(cv::Mat src,
 
 void SpillTracker::publishImage(cv::Mat image)
 {
+    static int counter=0;
     sensor_msgs::Image img_msg; // >> message to be sent
     std_msgs::Header header; // empty header
-    header.seq = 0; // user defined counter
+    header.seq = ++counter; // user defined counter
     header.stamp = ros::Time::now(); // time
 
     auto img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::BGR8, image);
@@ -127,6 +128,10 @@ void SpillTracker::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     this->curr_image = cv_ptr->image;
 
     cv::Mat mask = this->getMask(this->curr_image);
+
+    // if there is no oil, then just return
+    if (cv::sum(mask)[0] == 0) return;
+
     // make mask a 3 channel image
     std::vector<cv::Mat> vChannels;
     for (unsigned int c = 0; c < 3; c++)
@@ -139,6 +144,8 @@ void SpillTracker::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     this->tracker.update(mask3channels);
     std::vector<cv::Point2f> mc = tracker.get_centers();
 
+    if (mc.empty()) return;
+    
     // publish point
     geometry_msgs::Point p;
     p.x = mc[0].x;

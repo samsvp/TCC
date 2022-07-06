@@ -1,4 +1,6 @@
 #include <vector>
+#include <fstream>
+#include <iostream>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -6,10 +8,12 @@
 
 #include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/Point.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
 #include "../include/drone.hpp"
+#include "../include/spill_tracker.hpp"
 
 
 /*
@@ -21,11 +25,13 @@ public:
     DroneMain(float battery_duration, ros::NodeHandle& control_node,
             std::vector<types::waypoint> main_trajectory, float h) : 
             drone(battery_duration, control_node, h),
-            main_trajectory(main_trajectory), altitude(h)
+            main_trajectory(main_trajectory), altitude(h),
+            spill_tracker(control_node)
     {
+        this->centroid_sub = control_node.subscribe(
+            "/centroid_pred", 100, &DroneMain::centroidCallback, this);
         this->go_to_pos_sub = control_node.subscribe(
             "/go_to_pos", 1, &DroneMain::goToPosition, this);
-        
         this->camera_image_sub = control_node.subscribe(
             "/webcam/image_raw", 1, &DroneMain::imageCallback, this);
 
@@ -57,10 +63,15 @@ public:
             { pose->position.x, pose->position.y, this->altitude, psi }
         };
         this->drone.setTrajectory(waypoints);
-        // resume trajectory should be based on state machine
-        this->drone.resumeTrajectory();
 
-        this->break_trajectory = false;
+        if (!this->oil_detected)
+        {
+            // resume trajectory should be based on state machine
+            this->drone.resumeTrajectory();
+
+            this->break_trajectory = false;
+        }
+
     }
 
 
@@ -95,8 +106,41 @@ public:
     }
 
 
+    void centroidCallback(const geometry_msgs::Point::ConstPtr& msg)
+    {
+        auto p = drone.getCurrentLocation();
+        
+        // calculate world offset
+        float offset_x = (msg->x) * 0.001;
+        float offset_y = (msg->y) * 0.001;
+
+        // this is just the cube
+        if (std::abs(offset_x + p.x) < 12.0 && std::abs(offset_y + p.y) < 12.0) return;
+
+        ROS_INFO("Current Pos=%f, %f; Offset positions=%f, %f", 
+            p.x, p.y, offset_x, offset_y);
+
+        this->oil_detected = true;
+        this->break_trajectory = true;
+        // go to the oil center
+        this->drone.setDestination(-offset_x + p.x, -offset_y + p.y, p.z, 0);
+        
+        // save current position
+        std::ofstream myfile;
+        myfile.open("/home/nito/git/TCC/data.txt", std::ios_base::app);
+        myfile << p.x << ", " << p.y << ", " << p.z << "\n";
+        myfile.close();
+
+        ROS_INFO("Current position=%f, %f, %f", 
+            p.x, p.y, p.z);
+    }
+
+
 private:
-    Drone drone; 
+    Drone drone;
+    SpillTracker spill_tracker;
+
+    ros::Subscriber centroid_sub;
     ros::Subscriber go_to_pos_sub;
     ros::Subscriber camera_image_sub;
     cv::Mat curr_image;
@@ -107,9 +151,9 @@ private:
     float altitude;
 
     // hold if oil has been detected on the given frame
-    bool oil_detected;
+    bool oil_detected=false;
     // holds if the drone should break the main trajectory
-    bool break_trajectory;
+    bool break_trajectory=false;
     // holds the main waypoints that the drone should patrol
     std::vector<types::waypoint> main_trajectory;
 

@@ -29,6 +29,9 @@ def calibrate(image: np.ndarray) -> float:
 class image_converter:
 
     def __init__(self):
+        with open('data.txt', 'w') as file:
+            pass
+
         self.bridge = CvBridge()
         
         self.centroid_pub = rospy.Publisher(
@@ -101,6 +104,9 @@ class image_converter:
         self.centroid_pub.publish(Float64MultiArray(data=centroid))
         
         print(f"Spill area = {spill_area}, centroid = {centroid}")
+        with open('data.txt', 'a') as file:
+            file.write(str(centroid))
+            file.write("\n")
 
 
 if __name__ == '__main__':
